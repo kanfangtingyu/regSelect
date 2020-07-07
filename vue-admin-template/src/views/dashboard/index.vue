@@ -1,7 +1,7 @@
 <template>
   <div class="dashboard-editor-container">
     <el-steps :active="active">
-      <el-step title="Select Method" />
+      <el-step title="Enter Data" />
       <el-step title="Select Fields" />
       <el-step title="Vlidate" />
       <el-step title="Save" />
@@ -12,69 +12,110 @@
       <el-button type="primary" :disabled="active==5" @click="next_step">next step<i class="el-icon-arrow-right el-icon--right" /></el-button>
     </el-button-group>
     <div v-if="active==1">
-      <el-radio v-model="radio" label="1">regular expression</el-radio>
-      <el-radio v-model="radio" label="2">delimiters</el-radio>
+      <p>Please enter the data you want to parse</p>
+      <codemirror ref="returnReg" v-model="inputlog" :options="cmOptions1" />
     </div>
     <div v-if="active==2">
+      <p>Please choose the feild and add name</p>
       <el-popover
         v-model="visible"
         placement="bottom"
-        width="300"
+        width="500"
         @show="showSelect"
       >
         <el-form ref="form" :model="selectform" label-width="90px">
-          <el-button style="margin-left:200px;margin-bottom:10px" type="primary" @click="submitTxt">OK</el-button>
+          <el-button style="margin-left:400px;margin-bottom:10px" type="primary" @click="submitTxt">OK</el-button>
           <el-form-item label="Field Name">
-            <el-input v-model="selectform.selectname" @keyup.enter.native="submitTxt" />
+            <el-input v-model="selectform.selectname" @keyup.enter.native.stop="submitTxt" />
           </el-form-item>
           <el-form-item label="Value">
             {{ selectform.selectTxtValue }}
           </el-form-item>
         </el-form>
-        <el-input id="selectInput" slot="reference" v-model="rawdata[1]._event.raw" :readonly="true" placeholder="请输入内容" />
+        <codemirror id="selectInput" ref="selectInput" slot="reference" v-model="rawdata[1]._event.raw" :options="cmOptions" type="textarea" :readonly="true" />
+        <!-- <el-input id="selectInput" slot="reference" v-model="rawdata[1]._event.raw" type="textarea" :rows="3" :readonly="true" placeholder="请输入内容" /> -->
       </el-popover>
       <div v-if="tablevisible">
         <fixed-thead :rawdata.sync="rawdata" />
       </div>
     </div>
     <div v-if="active==3">
-      <el-input v-model="returnReg" :readonly="true" />
+      <codemirror ref="returnReg" v-model="returnReg" :options="cmOptions" />
+      <!-- <el-input v-model="returnReg" :readonly="true" /> -->
     </div>
     <div v-if="active==4">
-      <el-radio v-model="radio" label="1">备选项4</el-radio>
-      <el-radio v-model="radio" label="2">备选项</el-radio>
+      <p>to be continue</p>
     </div>
     <div v-if="active==5">
-      <el-radio v-model="radio" label="1">备选项5</el-radio>
-      <el-radio v-model="radio" label="2">备选项</el-radio>
+      <p>to be continue</p>
     </div>
   </div>
 </template>
 
 <script>
 import FixedThead from '../../components/FixedThead'
+import { codemirror } from 'vue-codemirror'
+import 'codemirror/mode/python/python.js'
+import 'codemirror/lib/codemirror.css'
+import 'codemirror/mode/javascript/javascript'
+import 'codemirror/mode/clike/clike'
+import 'codemirror/mode/go/go'
+import 'codemirror/mode/htmlmixed/htmlmixed'
+import 'codemirror/mode/http/http'
+import 'codemirror/mode/php/php'
+import 'codemirror/mode/python/python'
+import 'codemirror/mode/http/http'
+import 'codemirror/mode/sql/sql'
+import 'codemirror/mode/vue/vue'
+import 'codemirror/mode/xml/xml'
+require('codemirror/theme/3024-day.css')
+
 export default {
   name: 'DashboardAdmin',
-  components: { FixedThead },
+  components: {
+    FixedThead,
+    codemirror
+  },
   data() {
     return {
-      active: 2,
+      active: 1,
       radio: '1',
       visible: false,
       visible2: false,
       tablevisible: false,
+      // 输入的日志data
+      inputlog: '15.151.182.2 - - [15/May/2005:04:05:34 -0700] \"POST /rs-soap/services/RSPortal HTTP/1.0\" 200 384 \"-\" \"Axis/1.1\"',
       // 返回的reg表达式
       returnReg: '',
       // 传到后台的数据
       rawdata: {
         '1': {
-          _event: { raw: '15.151.182.2 - - [15/May/2005:04:05:34 -0700] \"POST /rs-soap/services/RSPortal HTTP/1.0\" 200 384 \"-\" \"Axis/1.1\"' }
+          _event: { raw: '' }
         }
       },
       // 选中的value值
       selectform: {
         selectname: '',
         selectTxtValue: ''
+      },
+      // reg富文本配置
+      cmOptions1: {
+        tabSize: 4,
+        mode: 'javascript',
+        theme: 'ambiance-mobile',
+        lineNumbers: false,
+        line: true
+        // readOnly: true
+        // more CodeMirror options...
+      },
+      cmOptions: {
+        tabSize: 4,
+        mode: 'javascript',
+        theme: '3024-day',
+        lineNumbers: false,
+        line: true
+        // readOnly: true
+        // more CodeMirror options...
       }
     }
   },
@@ -83,10 +124,17 @@ export default {
       this.active--
     },
     next_step() {
+      if (this.active === 1) {
+        this.rawdata[1]._event.raw = this.inputlog
+      }
       if (this.active === 2) {
         this.axios.post('http://10.124.207.246:5000/regex/api/v1.0/extraction', this.rawdata)
           .then(res => {
-            this.returnReg = res.data
+            if (res.data.length > 0) {
+              this.returnReg = res.data
+            } else {
+              this.returnReg = 'You have choose no data or the data can not be parsed'
+            }
           })
           .catch(err => {
             console.log(err)
@@ -108,19 +156,36 @@ export default {
       this.selectform.selectname = ''
     },
     // step2弹框
-    showSelect() {
-      const a = document.getElementById('selectInput')
-      if (a.selectionStart === a.selectionEnd) {
-        alert('Please select the field')
+    showSelect(value) {
+      const a = this.$refs.selectInput.codemirror.getSelection()
+      if (a && a.length > 0) {
+        this.selectform.selectTxtValue = a
+      } else {
         this.visible = false
+        alert('Please select the field')
       }
-      this.selectform.selectTxtValue = a.value.substring(a.selectionStart, a.selectionEnd)
     }
   }
 }
 </script>
 
 <style lang="scss">
+.CodeMirror {
+  font-size : 15px;
+  letter-spacing: 2px;
+}
+#selectInput {
+  .CodeMirror {
+    border: 1px solid #eee;
+    height: auto;
+  }
+
+  .CodeMirror-scroll {
+      height: auto;
+      overflow-y: hidden;
+      overflow-x: auto;
+  }
+}
 #selectInput{
   letter-spacing: 1px;
 }
